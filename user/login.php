@@ -1,71 +1,61 @@
 <?php
 session_start();
+
 require_once __DIR__ . '/../config/config.php';
 
-// If already logged in, go to home
-if (!empty($_SESSION['member_id'])) {
-    header('Location: index.html');
-    exit;
+$error = '';
+$savedEmail = ''; // 1. Initialize the variable to prevent the warning
+
+// 2. Check if the user has a saved email cookie from a previous "Remember Me"
+if (isset($_COOKIE['remember_email'])) {
+    $savedEmail = $_COOKIE['remember_email'];
 }
 
-$error = '';
-
-// Handle form submit
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    $email    = trim($_POST['email'] ?? '');
+    $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
-    $remember = isset($_POST['remember']);
+    $remember = isset($_POST['remember']); // Check if remember me was ticked
 
-    if ($email === '' || $password === '') {
-        $error = 'Please enter your email and password.';
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = 'Please enter a valid email address.';
+    if ($email == '' || $password == '') {
+        $error = "Please enter email and password.";
     } else {
-        try {
-            $stmt = $pdo->prepare(
-                'SELECT id, full_name, email, password_hash, status
-                 FROM members WHERE email = ? LIMIT 1'
-            );
-            $stmt->execute([$email]);
-            $member = $stmt->fetch();
+        $sql = "SELECT id, full_name, email, password_hash
+                FROM members
+                WHERE email = ?";
 
-            if (!$member || !password_verify($password, $member['password_hash'])) {
-                $error = 'Invalid email or password.';
-            } elseif ($member['status'] !== 'active') {
-                $error = 'Your account is not active. Please contact support.';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$email]);
+
+        $member = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($member && password_verify($password, $member['password_hash'])) {
+
+            session_regenerate_id(true);
+
+            $_SESSION['member_id'] = $member['id'];
+            $_SESSION['member_name'] = $member['full_name'];
+            $_SESSION['member_email'] = $member['email'];
+
+            // 3. Handle the "Remember Me" cookie
+            if ($remember) {
+                // Save email for 30 days
+                setcookie('remember_email', $email, time() + (86400 * 30), "/"); 
             } else {
-                // ✅ Success
-                session_regenerate_id(true);
-                $_SESSION['member_id']    = (int)$member['id'];
-                $_SESSION['member_name']  = $member['full_name'];
-                $_SESSION['member_email'] = $member['email'];
-
-                // Remember me (optional — just saves email for now)
-                if ($remember) {
-                    setcookie('ironelite_email', $email, [
-                        'expires'  => time() + 60 * 60 * 24 * 30,
-                        'path'     => '/',
-                        'secure'   => !empty($_SERVER['HTTPS']),
-                        'httponly' => true,
-                        'samesite' => 'Lax',
-                    ]);
-                } else {
-                    setcookie('ironelite_email', '', time() - 3600, '/');
-                }
-
-                header('Location: index.html');
-                exit;
+                // Clear the cookie if they uncheck the box
+                setcookie('remember_email', '', time() - 3600, "/"); 
             }
-        } catch (PDOException $e) {
-            error_log($e->getMessage());
-            $error = 'Something went wrong. Please try again.';
+
+            header("Location: ../index.html");
+            exit;
+
+        } else {
+            $error = "Invalid email or password.";
+            // Keep the email filled in if login fails so they don't have to retype it
+            $savedEmail = htmlspecialchars($email); 
         }
     }
 }
-
-// Prefill email if remembered
-$savedEmail = $_COOKIE['ironelite_email'] ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="en">

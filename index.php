@@ -1,3 +1,362 @@
+<?php
+require_once __DIR__ . '/config/config.php'; // loads $pdo
+
+try {
+    $stmt = $pdo->query("SELECT * FROM hero_section WHERE is_active = 1 LIMIT 1");
+    $hero = $stmt->fetch();
+
+    if (!$hero) {
+        $hero = [
+            'eyebrow_text'        => 'Est. 2016 — Performance Redefined',
+            'title_line_1'        => 'Forged in',
+            'title_line_2'        => 'Iron.',
+            'title_line_3'        => 'Built for',
+            'title_line_4'        => 'Elite.',
+            'title_line_2_accent' => 1,
+            'description'         => 'More than a gym. A performance laboratory where discipline meets design, and every rep is engineered for progress. Step inside the circle.',
+            'cta_primary_text'    => 'Join Now',
+            'cta_primary_link'    => '#pricing',
+            'cta_primary_icon'    => 'bi bi-arrow-up-right',
+            'cta_secondary_text'  => 'Explore Programs',
+            'cta_secondary_link'  => '#programs',
+            'scroll_text'         => 'Scroll',
+            'background_image'    => '',
+            'background_video'    => '',
+        ];
+    }
+} catch (PDOException $e) {
+    error_log('Hero fetch failed: ' . $e->getMessage());
+    $hero = null;
+}
+
+// ---- Marquee items ----
+try {
+    $stmt = $pdo->query("
+        SELECT label
+        FROM marquee_items
+        WHERE is_active = 1
+        ORDER BY sort_order ASC, id ASC
+    ");
+    $marquee_items = $stmt->fetchAll(PDO::FETCH_COLUMN); // array of strings
+} catch (PDOException $e) {
+    error_log('Marquee fetch failed: ' . $e->getMessage());
+    $marquee_items = [];
+}
+
+
+// ---- About section ----
+try {
+    $stmt = $pdo->query("SELECT * FROM about_section WHERE is_active = 1 ORDER BY id ASC LIMIT 1");
+    $about = $stmt->fetch();
+
+    if (!$about) {
+        $about = [
+            'label'          => 'The Story',
+            'title_line_1'   => 'Where Ambition',
+            'title_line_2'   => 'Meets Architecture',
+            'para_1'         => '',
+            'para_2'         => '',
+            'image'          => '',
+        ];
+    }
+} catch (PDOException $e) {
+    error_log('About fetch failed: ' . $e->getMessage());
+    $about = null;
+}
+
+
+// ---- Pricing section header ----
+try {
+    $stmt = $pdo->query("SELECT * FROM pricing_section WHERE is_active = 1 ORDER BY id ASC LIMIT 1");
+    $pricing_section = $stmt->fetch() ?: [
+        'label'    => 'Membership',
+        'title'    => 'Invest in Your Edge',
+        'subtitle' => '',
+    ];
+} catch (PDOException $e) {
+    error_log('Pricing section fetch failed: ' . $e->getMessage());
+    $pricing_section = null;
+}
+
+// ---- Pricing plans + their features ----
+$pricing_plans = [];
+try {
+    $stmt = $pdo->query("
+        SELECT *
+        FROM pricing_plans
+        WHERE is_active = 1
+        ORDER BY sort_order ASC, id ASC
+    ");
+    $plans = $stmt->fetchAll();
+
+    if ($plans) {
+        $planIds = array_column($plans, 'id');
+        // PDO-safe IN clause
+        $in = implode(',', array_fill(0, count($planIds), '?'));
+        $fstmt = $pdo->prepare("
+            SELECT plan_id, feature_text, is_included
+            FROM pricing_features
+            WHERE plan_id IN ($in)
+            ORDER BY sort_order ASC, id ASC
+        ");
+        $fstmt->execute($planIds);
+
+        // Group features by plan_id
+        $featuresByPlan = [];
+        foreach ($fstmt->fetchAll() as $f) {
+            $featuresByPlan[$f['plan_id']][] = $f;
+        }
+
+        foreach ($plans as $p) {
+            $p['features'] = $featuresByPlan[$p['id']] ?? [];
+            $pricing_plans[] = $p;
+        }
+    }
+} catch (PDOException $e) {
+    error_log('Pricing plans fetch failed: ' . $e->getMessage());
+    $pricing_plans = [];
+}
+
+// ---- Programs section header ----
+try {
+    $stmt = $pdo->query("SELECT * FROM programs_section WHERE is_active = 1 ORDER BY id ASC LIMIT 1");
+    $programs_section = $stmt->fetch() ?: [
+        'label'    => 'Disciplines',
+        'title'    => 'Train With Purpose',
+        'subtitle' => '',
+    ];
+} catch (PDOException $e) {
+    error_log('Programs section fetch failed: ' . $e->getMessage());
+    $programs_section = null;
+}
+
+// ---- Program items ----
+$programs_items = [];
+try {
+    $stmt = $pdo->query("
+        SELECT *
+        FROM programs_items
+        WHERE is_active = 1
+        ORDER BY sort_order ASC, id ASC
+    ");
+    $programs_items = $stmt->fetchAll();
+} catch (PDOException $e) {
+    error_log('Programs items fetch failed: ' . $e->getMessage());
+    $programs_items = [];
+}
+
+// ---- Trainers section header ----
+try {
+    $stmt = $pdo->query("SELECT * FROM trainers_section WHERE is_active = 1 ORDER BY id ASC LIMIT 1");
+    $trainers_section = $stmt->fetch() ?: [
+        'label'    => 'The Coaches',
+        'title'    => 'Masters of Their Craft',
+        'subtitle' => '',
+    ];
+} catch (PDOException $e) {
+    error_log('Trainers section fetch failed: ' . $e->getMessage());
+    $trainers_section = null;
+}
+
+// ---- Trainer items ----
+$trainers_items = [];
+try {
+    $stmt = $pdo->query("
+        SELECT *
+        FROM trainers_items
+        WHERE is_active = 1
+        ORDER BY sort_order ASC, id ASC
+    ");
+    $trainers_items = $stmt->fetchAll();
+} catch (PDOException $e) {
+    error_log('Trainers items fetch failed: ' . $e->getMessage());
+    $trainers_items = [];
+}
+
+
+// ---- Facilities section header ----
+try {
+    $stmt = $pdo->query("SELECT * FROM facilities_section WHERE is_active = 1 ORDER BY id ASC LIMIT 1");
+    $facilities_section = $stmt->fetch() ?: [
+        'label'         => 'The Space',
+        'title_line_1'  => 'Built for',
+        'title_line_2'  => 'Performance',
+        'subtitle'      => '',
+        'image_main'    => '',
+        'image_small_1' => '',
+        'image_small_2' => '',
+    ];
+} catch (PDOException $e) {
+    error_log('Facilities section fetch failed: ' . $e->getMessage());
+    $facilities_section = null;
+}
+
+// ---- Facility items ----
+$facilities_items = [];
+try {
+    $stmt = $pdo->query("
+        SELECT *
+        FROM facilities_items
+        WHERE is_active = 1
+        ORDER BY sort_order ASC, id ASC
+    ");
+    $facilities_items = $stmt->fetchAll();
+} catch (PDOException $e) {
+    error_log('Facilities items fetch failed: ' . $e->getMessage());
+    $facilities_items = [];
+}
+
+// ---- Testimonials section header ----
+try {
+    $stmt = $pdo->query("SELECT * FROM testimonials_section WHERE is_active = 1 ORDER BY id ASC LIMIT 1");
+    $testimonials_section = $stmt->fetch() ?: [
+        'label'    => 'Community',
+        'title'    => 'What Members Say',
+        'subtitle' => '',
+    ];
+} catch (PDOException $e) {
+    error_log('Testimonials section fetch failed: ' . $e->getMessage());
+    $testimonials_section = null;
+}
+
+// ---- Testimonial items ----
+$testimonials_items = [];
+try {
+    $stmt = $pdo->query("
+        SELECT *
+        FROM testimonials_items
+        WHERE is_active = 1
+        ORDER BY sort_order ASC, id ASC
+    ");
+    $testimonials_items = $stmt->fetchAll();
+} catch (PDOException $e) {
+    error_log('Testimonials items fetch failed: ' . $e->getMessage());
+    $testimonials_items = [];
+}
+
+// Fallback if empty
+if (empty($marquee_items)) {
+    $marquee_items = ['Strength','Discipline','Performance','Community','Results','Mindset'];
+}
+
+// ---- Schedule section header ----
+try {
+    $stmt = $pdo->query("SELECT * FROM schedule_section WHERE is_active = 1 ORDER BY id ASC LIMIT 1");
+    $schedule_section = $stmt->fetch() ?: [
+        'label'    => 'Timetable',
+        'title'    => 'Weekly Schedule',
+        'subtitle' => '',
+    ];
+} catch (PDOException $e) {
+    error_log('Schedule section fetch failed: ' . $e->getMessage());
+    $schedule_section = null;
+}
+
+// ---- Schedule times (row headers) + cells ----
+$schedule_times = [];       // [ ['id'=>1,'time_label'=>'06:00',...], ... ]
+$schedule_grid  = [];       // [ time_id => [ day_index => class_name ], ... ]
+
+try {
+    // Row headers — assumes schedule_times table; adjust name/column if different
+    $stmt = $pdo->query("
+        SELECT id, time_label
+        FROM schedule_times
+        ORDER BY sort_order ASC, id ASC
+    ");
+    $schedule_times = $stmt->fetchAll();
+} catch (PDOException $e) {
+    error_log('Schedule times fetch failed: ' . $e->getMessage());
+    $schedule_times = [];
+}
+
+try {
+    // Cells: build a grid keyed [time_id][day_index]
+    $stmt = $pdo->query("SELECT time_id, day_index, class_name FROM schedule_cells");
+    foreach ($stmt->fetchAll() as $c) {
+        $schedule_grid[$c['time_id']][$c['day_index']] = $c['class_name'];
+    }
+} catch (PDOException $e) {
+    error_log('Schedule cells fetch failed: ' . $e->getMessage());
+    $schedule_grid = [];
+}
+
+
+// ---- Journey section header ----
+try {
+    $stmt = $pdo->query("SELECT * FROM journey_section WHERE is_active = 1 ORDER BY id ASC LIMIT 1");
+    $journey_section = $stmt->fetch() ?: [
+        'label'    => 'Get Started',
+        'title'    => 'Your Journey Starts Here',
+        'subtitle' => '',
+        'cta_text' => 'Begin Your Transformation',
+        'cta_link' => '#pricing',
+        'cta_icon' => 'bi bi-arrow-right',
+    ];
+} catch (PDOException $e) {
+    error_log('Journey section fetch failed: ' . $e->getMessage());
+    $journey_section = null;
+}
+
+// ---- Journey steps ----
+$journey_steps = [];
+try {
+    $stmt = $pdo->query("
+        SELECT *
+        FROM journey_steps
+        WHERE is_active = 1
+        ORDER BY sort_order ASC, id ASC
+    ");
+    $journey_steps = $stmt->fetchAll();
+} catch (PDOException $e) {
+    error_log('Journey steps fetch failed: ' . $e->getMessage());
+    $journey_steps = [];
+}
+
+// ---- FAQ section header ----
+try {
+    $stmt = $pdo->query("SELECT * FROM faq_section WHERE is_active = 1 ORDER BY id ASC LIMIT 1");
+    $faq_section = $stmt->fetch() ?: [
+        'label'    => 'Questions',
+        'title'    => 'Everything You Need to Know',
+        'subtitle' => '',
+    ];
+} catch (PDOException $e) {
+    error_log('FAQ section fetch failed: ' . $e->getMessage());
+    $faq_section = null;
+}
+
+// ---- FAQ items ----
+$faq_items = [];
+try {
+    $stmt = $pdo->query("
+        SELECT *
+        FROM faq_items
+        WHERE is_active = 1
+        ORDER BY sort_order ASC, id ASC
+    ");
+    $faq_items = $stmt->fetchAll();
+} catch (PDOException $e) {
+    error_log('FAQ items fetch failed: ' . $e->getMessage());
+    $faq_items = [];
+}
+
+// Helper: format FAQ title so admins can control the line break with "|" or a newline
+function faq_title_html($title) {
+    if (strpos($title, '|') !== false) {
+        $parts = array_map('trim', explode('|', $title, 2));
+        return htmlspecialchars($parts[0], ENT_QUOTES, 'UTF-8')
+             . '<br>'
+             . htmlspecialchars($parts[1], ENT_QUOTES, 'UTF-8');
+    }
+    if (strpos($title, "\n") !== false) {
+        return nl2br(htmlspecialchars($title, ENT_QUOTES, 'UTF-8'));
+    }
+    return htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
+}
+
+
+function e($str) { return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8'); }
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1145,16 +1504,7 @@
   <div class="cursor-dot" id="cursorDot"></div>
   <div class="cursor-ring" id="cursorRing"></div>
 
-  <!-- ============================================================
-       LOADING SCREEN
-       ============================================================ -->
-  <div id="loader">
-    <div class="loader-logo" id="loaderLogo">IRON <span>ELITE</span></div>
-    <div class="loader-bar-track" id="loaderBarTrack">
-      <div class="loader-bar-fill" id="loaderBarFill"></div>
-    </div>
-    <div class="loader-percent" id="loaderPercent">0%</div>
-  </div>
+  
 
   <!-- ============================================================
        NAVIGATION
@@ -1195,75 +1545,137 @@
     <a href="#contact" class="mobile-link">Contact</a>
   </div>
 
-  <!-- ============================================================
-       HERO
+    <!-- ============================================================
+       HERO — powered by hero_section table
        ============================================================ -->
+  <?php if (!empty($hero)): ?>
   <section class="hero-section" id="home">
-    <div class="hero-bg" id="heroBg"></div>
+    <?php if (!empty($hero['background_video'])): ?>
+      <video class="hero-bg" id="heroBg" autoplay muted loop playsinline
+             <?php if (!empty($hero['background_image'])): ?>
+               poster="<?= e($hero['background_image']) ?>"
+             <?php endif; ?>
+             style="object-fit: cover; width:100%; height:100%;">
+        <source src="<?= e($hero['background_video']) ?>" type="video/mp4">
+      </video>
+    <?php elseif (!empty($hero['background_image'])): ?>
+      <div class="hero-bg" id="heroBg"
+           style="background-image: url('<?= e($hero['background_image']) ?>');"></div>
+    <?php else: ?>
+      <div class="hero-bg" id="heroBg"></div>
+    <?php endif; ?>
+
     <div class="hero-overlay"></div>
+
     <div class="hero-content">
-      <div class="hero-eyebrow">Est. 2016 — Performance Redefined</div>
+      <?php if (!empty($hero['eyebrow_text'])): ?>
+        <div class="hero-eyebrow"><?= e($hero['eyebrow_text']) ?></div>
+      <?php endif; ?>
+
       <h1 class="hero-title" id="heroTitle">
-        <span class="line"><span>Forged in</span></span>
-        <span class="line"><span class="accent">Iron.</span></span>
-        <span class="line"><span>Built for</span></span>
-        <span class="line"><span>Elite.</span></span>
+        <?php if (!empty($hero['title_line_1'])): ?>
+          <span class="line"><span><?= e($hero['title_line_1']) ?></span></span>
+        <?php endif; ?>
+        <?php if (!empty($hero['title_line_2'])): ?>
+          <span class="line">
+            <span class="<?= $hero['title_line_2_accent'] ? 'accent' : '' ?>"><?= e($hero['title_line_2']) ?></span>
+          </span>
+        <?php endif; ?>
+        <?php if (!empty($hero['title_line_3'])): ?>
+          <span class="line"><span><?= e($hero['title_line_3']) ?></span></span>
+        <?php endif; ?>
+        <?php if (!empty($hero['title_line_4'])): ?>
+          <span class="line"><span><?= e($hero['title_line_4']) ?></span></span>
+        <?php endif; ?>
       </h1>
-      <p class="hero-desc">
-        More than a gym. A performance laboratory where discipline meets design, and every rep is engineered for progress. Step inside the circle.
-      </p>
+
+      <?php if (!empty($hero['description'])): ?>
+        <p class="hero-desc"><?= e($hero['description']) ?></p>
+      <?php endif; ?>
+
       <div class="hero-ctas">
-        <a href="#pricing" class="btn-accent magnetic" data-cursor="cta">Join Now <i class="bi bi-arrow-up-right"></i></a>
-        <a href="#programs" class="btn-ghost magnetic" data-cursor="link">Explore Programs</a>
+        <?php if (!empty($hero['cta_primary_text'])): ?>
+          <a href="<?= e($hero['cta_primary_link']) ?>" class="btn-accent magnetic" data-cursor="cta">
+            <?= e($hero['cta_primary_text']) ?>
+            <?php if (!empty($hero['cta_primary_icon'])): ?>
+              <i class="<?= e($hero['cta_primary_icon']) ?>"></i>
+            <?php endif; ?>
+          </a>
+        <?php endif; ?>
+        <?php if (!empty($hero['cta_secondary_text'])): ?>
+          <a href="<?= e($hero['cta_secondary_link']) ?>" class="btn-ghost magnetic" data-cursor="link">
+            <?= e($hero['cta_secondary_text']) ?>
+          </a>
+        <?php endif; ?>
       </div>
     </div>
+
     <div class="hero-scroll-indicator">
-      <span>Scroll</span>
+      <span><?= e($hero['scroll_text'] ?? 'Scroll') ?></span>
       <div class="scroll-line"></div>
     </div>
   </section>
+  <?php endif; ?>
 
-  <!-- ============================================================
-       MARQUEE
+    <!-- ============================================================
+       MARQUEE — powered by marquee_items table
        ============================================================ -->
+  <?php if (!empty($marquee_items)): ?>
   <div class="marquee-section">
     <div class="marquee-track" id="marqueeTrack">
-      <span class="marquee-item">Strength</span>
-      <span class="marquee-item">Discipline</span>
-      <span class="marquee-item">Performance</span>
-      <span class="marquee-item">Community</span>
-      <span class="marquee-item">Results</span>
-      <span class="marquee-item">Mindset</span>
-      <span class="marquee-item">Strength</span>
-      <span class="marquee-item">Discipline</span>
-      <span class="marquee-item">Performance</span>
-      <span class="marquee-item">Community</span>
-      <span class="marquee-item">Results</span>
-      <span class="marquee-item">Mindset</span>
+      <?php
+        // Duplicate the list so the CSS -50% loop is seamless
+        for ($pass = 0; $pass < 2; $pass++):
+          foreach ($marquee_items as $item):
+      ?>
+        <span class="marquee-item"><?= e($item) ?></span>
+      <?php
+          endforeach;
+        endfor;
+      ?>
     </div>
   </div>
+  <?php endif; ?>
 
-  <!-- ============================================================
-       ABOUT
+    <!-- ============================================================
+       ABOUT — powered by about_section table
        ============================================================ -->
+  <?php if (!empty($about)): ?>
   <section class="section-pad about-section" id="about">
     <div class="container">
       <div class="row align-items-center g-5">
         <div class="col-lg-6">
           <div class="about-img-wrap" data-reveal>
-            <img src="https://images.unsplash.com/photo-1571902943202-507ec2618e8f?q=80&w=1975&auto=format&fit=crop" alt="Athlete training with battle ropes in luxury gym" loading="lazy">
+            <?php if (!empty($about['image'])): ?>
+              <img src="<?= e($about['image']) ?>"
+                   alt="<?= e($about['title_line_1'] . ' ' . $about['title_line_2']) ?>"
+                   loading="lazy">
+            <?php else: ?>
+              <img src="https://images.unsplash.com/photo-1571902943202-507ec2618e8f?q=80&w=1975&auto=format&fit=crop"
+                   alt="Athlete training with battle ropes in luxury gym" loading="lazy">
+            <?php endif; ?>
             <div class="about-img-accent"></div>
           </div>
         </div>
+
         <div class="col-lg-6">
-          <div class="section-label" data-reveal>The Story</div>
-          <h2 class="section-title" data-reveal>Where Ambition<br>Meets Architecture</h2>
-          <p class="section-sub mb-4" data-reveal>
-            IRON ELITE FITNESS was born from a simple conviction: the environment you train in should be as uncompromising as your goals. We built a space where world-class equipment, elite coaching, and cinematic atmosphere converge — a sanctuary for those who take their potential seriously.
-          </p>
-          <p style="color: var(--grey); font-size: 0.9rem; line-height: 1.7;" data-reveal>
-            From the moment you walk through our doors, every detail is designed to elevate. No distractions. No compromise. Just the work, the community, and the relentless pursuit of better.
-          </p>
+          <?php if (!empty($about['label'])): ?>
+            <div class="section-label" data-reveal><?= e($about['label']) ?></div>
+          <?php endif; ?>
+
+          <h2 class="section-title" data-reveal>
+            <?= e($about['title_line_1']) ?><?php if (!empty($about['title_line_2'])): ?><br><?= e($about['title_line_2']) ?><?php endif; ?>
+          </h2>
+
+          <?php if (!empty($about['para_1'])): ?>
+            <p class="section-sub mb-4" data-reveal><?= e($about['para_1']) ?></p>
+          <?php endif; ?>
+
+          <?php if (!empty($about['para_2'])): ?>
+            <p style="color: var(--grey); font-size: 0.9rem; line-height: 1.7;" data-reveal>
+              <?= e($about['para_2']) ?>
+            </p>
+          <?php endif; ?>
 
           <div class="row g-4 mt-4" data-reveal>
             <div class="col-4">
@@ -1289,285 +1701,236 @@
       </div>
     </div>
   </section>
+  <?php endif; ?>
 
-  <!-- ============================================================
-       PRICING
+    <!-- ============================================================
+       PRICING — powered by pricing_section, pricing_plans, pricing_features
        ============================================================ -->
+  <?php if (!empty($pricing_section) && !empty($pricing_plans)): ?>
   <section class="section-pad" id="pricing">
     <div class="container">
       <div class="text-center mb-5">
-        <div class="section-label justify-content-center" data-reveal>Membership</div>
-        <h2 class="section-title" data-reveal>Invest in Your Edge</h2>
-        <p class="section-sub mx-auto" data-reveal>Transparent pricing. No hidden fees. Cancel anytime with 30 days notice.</p>
+        <?php if (!empty($pricing_section['label'])): ?>
+          <div class="section-label justify-content-center" data-reveal><?= e($pricing_section['label']) ?></div>
+        <?php endif; ?>
+        <?php if (!empty($pricing_section['title'])): ?>
+          <h2 class="section-title" data-reveal><?= e($pricing_section['title']) ?></h2>
+        <?php endif; ?>
+        <?php if (!empty($pricing_section['subtitle'])): ?>
+          <p class="section-sub mx-auto" data-reveal><?= e($pricing_section['subtitle']) ?></p>
+        <?php endif; ?>
       </div>
 
       <div class="row g-4 align-items-stretch">
-        <!-- Basic -->
-        <div class="col-lg-4 col-md-6" data-reveal>
-          <div class="pricing-card" data-plan="Basic">
-            <div class="pricing-name">Basic</div>
-            <div class="pricing-price">$49<span>/mo</span></div>
-            <ul class="pricing-features">
-              <li><i class="bi bi-check-lg"></i> Full gym access</li>
-              <li><i class="bi bi-check-lg"></i> Locker room & showers</li>
-              <li><i class="bi bi-check-lg"></i> 1 group class / week</li>
-              <li class="disabled"><i class="bi bi-dash"></i> Personal training</li>
-              <li class="disabled"><i class="bi bi-dash"></i> Recovery lounge</li>
-            </ul>
-            <button class="btn-ghost plan-select w-100" data-plan="Basic">Select Basic</button>
-          </div>
-        </div>
+        <?php foreach ($pricing_plans as $plan): ?>
+          <?php
+            $isFeatured  = !empty($plan['is_featured']);
+            $btnStyle    = $plan['button_style'] === 'accent' ? 'btn-accent' : 'btn-ghost';
+            $btnExtra    = $plan['button_style'] === 'accent' ? 'magnetic' : '';
+            $planNameEsc = e($plan['name']);
+            // Center the last card if row has an odd count on md+
+            $colClass = ($isFeatured || count($pricing_plans) === 3) ? '' : 'mx-md-auto';
+          ?>
+          <div class="col-lg-4 col-md-6 <?= $colClass ?>" data-reveal>
+            <div class="pricing-card <?= $isFeatured ? 'featured' : '' ?>"
+                 data-plan="<?= $planNameEsc ?>">
 
-        <!-- Pro (Featured) -->
-        <div class="col-lg-4 col-md-6" data-reveal>
-          <div class="pricing-card featured" data-plan="Pro">
-            <div class="pricing-badge">Recommended</div>
-            <div class="pricing-name">Pro</div>
-            <div class="pricing-price">$89<span>/mo</span></div>
-            <ul class="pricing-features">
-              <li><i class="bi bi-check-lg"></i> Unlimited gym access</li>
-              <li><i class="bi bi-check-lg"></i> Unlimited group classes</li>
-              <li><i class="bi bi-check-lg"></i> 2 PT sessions / month</li>
-              <li><i class="bi bi-check-lg"></i> Recovery lounge access</li>
-              <li><i class="bi bi-check-lg"></i> Guest pass (1 / month)</li>
-            </ul>
-            <button class="btn-accent plan-select w-100 magnetic" data-plan="Pro" data-cursor="cta">Select Pro</button>
-          </div>
-        </div>
+              <?php if ($isFeatured && !empty($plan['badge_text'])): ?>
+                <div class="pricing-badge"><?= e($plan['badge_text']) ?></div>
+              <?php endif; ?>
 
-        <!-- Elite -->
-        <div class="col-lg-4 col-md-6 mx-md-auto" data-reveal>
-          <div class="pricing-card" data-plan="Elite">
-            <div class="pricing-name">Elite</div>
-            <div class="pricing-price">$159<span>/mo</span></div>
-            <ul class="pricing-features">
-              <li><i class="bi bi-check-lg"></i> Everything in Pro</li>
-              <li><i class="bi bi-check-lg"></i> 4 PT sessions / month</li>
-              <li><i class="bi bi-check-lg"></i> Personalized nutrition plan</li>
-              <li><i class="bi bi-check-lg"></i> Priority class booking</li>
-              <li><i class="bi bi-check-lg"></i> Quarterly body composition scan</li>
-            </ul>
-            <button class="btn-ghost plan-select w-100" data-plan="Elite">Select Elite</button>
+              <div class="pricing-name"><?= $planNameEsc ?></div>
+
+              <div class="pricing-price">
+                <?= e($plan['currency'] ?? '$') ?><?= e($plan['price']) ?><span><?= e($plan['period'] ?? '/mo') ?></span>
+              </div>
+
+              <ul class="pricing-features">
+                <?php foreach ($plan['features'] as $f): ?>
+                  <?php $included = (int)$f['is_included'] === 1; ?>
+                  <li class="<?= $included ? '' : 'disabled' ?>">
+                    <i class="bi <?= $included ? 'bi-check-lg' : 'bi-dash' ?>"></i>
+                    <?= e($f['feature_text']) ?>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+
+              <button class="<?= $btnStyle ?> <?= $btnExtra ?> plan-select w-100"
+                      data-plan="<?= $planNameEsc ?>"
+                      <?php if ($btnStyle === 'btn-accent'): ?>data-cursor="cta"<?php endif; ?>>
+                <?= e($plan['button_text'] ?: 'Select ' . $plan['name']) ?>
+              </button>
+            </div>
           </div>
-        </div>
+        <?php endforeach; ?>
       </div>
     </div>
   </section>
+  <?php endif; ?>
 
-  <!-- ============================================================
-       PROGRAMS
+    <!-- ============================================================
+       PROGRAMS — powered by programs_section, programs_items
        ============================================================ -->
+  <?php if (!empty($programs_section) && !empty($programs_items)): ?>
   <section class="section-pad" id="programs" style="background: var(--charcoal-2);">
     <div class="container">
       <div class="mb-5">
-        <div class="section-label" data-reveal>Disciplines</div>
-        <h2 class="section-title" data-reveal>Train With Purpose</h2>
-        <p class="section-sub" data-reveal>Seven pathways. One destination. Choose the discipline that matches your ambition.</p>
+        <?php if (!empty($programs_section['label'])): ?>
+          <div class="section-label" data-reveal><?= e($programs_section['label']) ?></div>
+        <?php endif; ?>
+        <?php if (!empty($programs_section['title'])): ?>
+          <h2 class="section-title" data-reveal><?= e($programs_section['title']) ?></h2>
+        <?php endif; ?>
+        <?php if (!empty($programs_section['subtitle'])): ?>
+          <p class="section-sub" data-reveal><?= e($programs_section['subtitle']) ?></p>
+        <?php endif; ?>
       </div>
 
       <div class="row g-4">
-        <!-- Strength Training -->
-        <div class="col-lg-3 col-md-6 col-6" data-reveal>
-          <div class="program-card">
-            <img src="https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?q=80&w=2070&auto=format&fit=crop" alt="Strength training with barbell" loading="lazy">
-            <div class="program-arrow"><i class="bi bi-arrow-up-right"></i></div>
-            <div class="program-overlay">
-              <div class="program-name">Strength Training</div>
-              <div class="program-desc">Progressive overload, compound lifts, and periodized programming for raw power.</div>
+        <?php foreach ($programs_items as $prog): ?>
+          <div class="col-lg-3 col-md-6 col-6" data-reveal>
+            <div class="program-card">
+              <?php if (!empty($prog['image'])): ?>
+                <img src="<?= e($prog['image']) ?>"
+                     alt="<?= e($prog['name']) ?>"
+                     loading="lazy">
+              <?php endif; ?>
+              <div class="program-arrow"><i class="bi bi-arrow-up-right"></i></div>
+              <div class="program-overlay">
+                <div class="program-name"><?= e($prog['name']) ?></div>
+                <?php if (!empty($prog['description'])): ?>
+                  <div class="program-desc"><?= e($prog['description']) ?></div>
+                <?php endif; ?>
+              </div>
             </div>
           </div>
-        </div>
-        <!-- Weight Loss -->
-        <div class="col-lg-3 col-md-6 col-6" data-reveal>
-          <div class="program-card">
-            <img src="https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=2070&auto=format&fit=crop" alt="Weight loss conditioning workout" loading="lazy">
-            <div class="program-arrow"><i class="bi bi-arrow-up-right"></i></div>
-            <div class="program-overlay">
-              <div class="program-name">Weight Loss</div>
-              <div class="program-desc">Metabolic conditioning and sustainable fat loss through science-backed protocols.</div>
-            </div>
-          </div>
-        </div>
-        <!-- Muscle Building -->
-        <div class="col-lg-3 col-md-6 col-6" data-reveal>
-          <div class="program-card">
-            <img src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=2070&auto=format&fit=crop" alt="Muscle building hypertrophy training" loading="lazy">
-            <div class="program-arrow"><i class="bi bi-arrow-up-right"></i></div>
-            <div class="program-overlay">
-              <div class="program-name">Muscle Building</div>
-              <div class="program-desc">Hypertrophy-focused splits with precision nutrition guidance for maximum growth.</div>
-            </div>
-          </div>
-        </div>
-        <!-- CrossFit -->
-        <div class="col-lg-3 col-md-6 col-6" data-reveal>
-          <div class="program-card">
-            <img src="https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?q=80&w=2070&auto=format&fit=crop" alt="CrossFit high intensity training" loading="lazy">
-            <div class="program-arrow"><i class="bi bi-arrow-up-right"></i></div>
-            <div class="program-overlay">
-              <div class="program-name">CrossFit</div>
-              <div class="program-desc">Functional fitness at high intensity. Constantly varied, community-driven.</div>
-            </div>
-          </div>
-        </div>
-        <!-- Personal Training -->
-        <div class="col-lg-3 col-md-6 col-6" data-reveal>
-          <div class="program-card">
-            <img src="https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=2070&auto=format&fit=crop" alt="Personal training session" loading="lazy">
-            <div class="program-arrow"><i class="bi bi-arrow-up-right"></i></div>
-            <div class="program-overlay">
-              <div class="program-name">Personal Training</div>
-              <div class="program-desc">One-on-one coaching tailored to your body, schedule, and ambitions.</div>
-            </div>
-          </div>
-        </div>
-        <!-- Cardio -->
-        <div class="col-lg-3 col-md-6 col-6" data-reveal>
-          <div class="program-card">
-            <img src="https://images.unsplash.com/photo-1538805060514-97d9cc17730c?q=80&w=2070&auto=format&fit=crop" alt="Cardio treadmill running" loading="lazy">
-            <div class="program-arrow"><i class="bi bi-arrow-up-right"></i></div>
-            <div class="program-overlay">
-              <div class="program-name">Cardio</div>
-              <div class="program-desc">Heart-rate zone training on premium equipment for endurance and health.</div>
-            </div>
-          </div>
-        </div>
-        <!-- Yoga -->
-        <div class="col-lg-3 col-md-6 col-6" data-reveal>
-          <div class="program-card">
-            <img src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=2070&auto=format&fit=crop" alt="Yoga and mobility session" loading="lazy">
-            <div class="program-arrow"><i class="bi bi-arrow-up-right"></i></div>
-            <div class="program-overlay">
-              <div class="program-name">Yoga</div>
-              <div class="program-desc">Mobility, recovery, and breathwork to balance intensity with longevity.</div>
-            </div>
-          </div>
-        </div>
+        <?php endforeach; ?>
       </div>
     </div>
   </section>
+  <?php endif; ?>
 
-  <!-- ============================================================
-       TRAINERS
+    <!-- ============================================================
+       TRAINERS — powered by trainers_section, trainers_items
        ============================================================ -->
+  <?php if (!empty($trainers_section) && !empty($trainers_items)): ?>
   <section class="section-pad" id="trainers">
     <div class="container">
       <div class="mb-5">
-        <div class="section-label" data-reveal>The Coaches</div>
-        <h2 class="section-title" data-reveal>Masters of Their Craft</h2>
-        <p class="section-sub" data-reveal>Certified, experienced, and relentlessly committed to your progress.</p>
+        <?php if (!empty($trainers_section['label'])): ?>
+          <div class="section-label" data-reveal><?= e($trainers_section['label']) ?></div>
+        <?php endif; ?>
+        <?php if (!empty($trainers_section['title'])): ?>
+          <h2 class="section-title" data-reveal><?= e($trainers_section['title']) ?></h2>
+        <?php endif; ?>
+        <?php if (!empty($trainers_section['subtitle'])): ?>
+          <p class="section-sub" data-reveal><?= e($trainers_section['subtitle']) ?></p>
+        <?php endif; ?>
       </div>
 
       <div class="row g-4">
-        <div class="col-lg-3 col-md-6 col-6" data-reveal>
-          <div class="trainer-card">
-            <img src="https://images.unsplash.com/photo-1567013127542-490d757e51fc?q=80&w=1974&auto=format&fit=crop" alt="Trainer Marcus Cole" loading="lazy">
-            <div class="trainer-overlay">
-              <div class="trainer-specialty">Strength & Conditioning</div>
-              <div class="trainer-name">Marcus Cole</div>
-              <div class="trainer-socials">
-                <a href="#" aria-label="Instagram"><i class="bi bi-instagram"></i></a>
-                <a href="#" aria-label="Twitter"><i class="bi bi-twitter-x"></i></a>
+        <?php foreach ($trainers_items as $tr): ?>
+          <div class="col-lg-3 col-md-6 col-6" data-reveal>
+            <div class="trainer-card">
+              <?php if (!empty($tr['image'])): ?>
+                <img src="<?= e($tr['image']) ?>"
+                     alt="Trainer <?= e($tr['name']) ?>"
+                     loading="lazy">
+              <?php endif; ?>
+              <div class="trainer-overlay">
+                <?php if (!empty($tr['specialty'])): ?>
+                  <div class="trainer-specialty"><?= e($tr['specialty']) ?></div>
+                <?php endif; ?>
+                <div class="trainer-name"><?= e($tr['name']) ?></div>
+                <?php if (!empty($tr['instagram_url']) || !empty($tr['twitter_url'])): ?>
+                  <div class="trainer-socials">
+                    <?php if (!empty($tr['instagram_url'])): ?>
+                      <a href="<?= e($tr['instagram_url']) ?>" aria-label="Instagram" target="_blank" rel="noopener">
+                        <i class="bi bi-instagram"></i>
+                      </a>
+                    <?php endif; ?>
+                    <?php if (!empty($tr['twitter_url'])): ?>
+                      <a href="<?= e($tr['twitter_url']) ?>" aria-label="Twitter" target="_blank" rel="noopener">
+                        <i class="bi bi-twitter-x"></i>
+                      </a>
+                    <?php endif; ?>
+                  </div>
+                <?php endif; ?>
               </div>
             </div>
           </div>
-        </div>
-        <div class="col-lg-3 col-md-6 col-6" data-reveal>
-          <div class="trainer-card">
-            <img src="https://images.unsplash.com/photo-1594381898411-846e7d193883?q=80&w=1974&auto=format&fit=crop" alt="Trainer Elena Voss" loading="lazy">
-            <div class="trainer-overlay">
-              <div class="trainer-specialty">HIIT & Fat Loss</div>
-              <div class="trainer-name">Elena Voss</div>
-              <div class="trainer-socials">
-                <a href="#" aria-label="Instagram"><i class="bi bi-instagram"></i></a>
-                <a href="#" aria-label="Twitter"><i class="bi bi-twitter-x"></i></a>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-lg-3 col-md-6 col-6" data-reveal>
-          <div class="trainer-card">
-            <img src="https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?q=80&w=2070&auto=format&fit=crop" alt="Trainer Jaxson Reed" loading="lazy">
-            <div class="trainer-overlay">
-              <div class="trainer-specialty">Bodybuilding</div>
-              <div class="trainer-name">Jaxson Reed</div>
-              <div class="trainer-socials">
-                <a href="#" aria-label="Instagram"><i class="bi bi-instagram"></i></a>
-                <a href="#" aria-label="Twitter"><i class="bi bi-twitter-x"></i></a>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-lg-3 col-md-6 col-6" data-reveal>
-          <div class="trainer-card">
-            <img src="https://images.unsplash.com/photo-1550345332-09e3ac987658?q=80&w=1974&auto=format&fit=crop" alt="Trainer Maya Chen" loading="lazy">
-            <div class="trainer-overlay">
-              <div class="trainer-specialty">Yoga & Mobility</div>
-              <div class="trainer-name">Maya Chen</div>
-              <div class="trainer-socials">
-                <a href="#" aria-label="Instagram"><i class="bi bi-instagram"></i></a>
-                <a href="#" aria-label="Twitter"><i class="bi bi-twitter-x"></i></a>
-              </div>
-            </div>
-          </div>
-        </div>
+        <?php endforeach; ?>
       </div>
     </div>
   </section>
+  <?php endif; ?>
 
-  <!-- ============================================================
-       FACILITIES
+    <!-- ============================================================
+       FACILITIES — powered by facilities_section, facilities_items
        ============================================================ -->
+  <?php if (!empty($facilities_section)): ?>
   <section class="section-pad" id="facilities" style="background: var(--charcoal-2);">
     <div class="container">
       <div class="row g-5 align-items-center">
         <div class="col-lg-5">
-          <div class="section-label" data-reveal>The Space</div>
-          <h2 class="section-title" data-reveal>Built for<br>Performance</h2>
-          <p class="section-sub mb-4" data-reveal>Every square foot engineered to remove friction between you and your best work.</p>
+          <?php if (!empty($facilities_section['label'])): ?>
+            <div class="section-label" data-reveal><?= e($facilities_section['label']) ?></div>
+          <?php endif; ?>
+
+          <h2 class="section-title" data-reveal>
+            <?= e($facilities_section['title_line_1']) ?><?php if (!empty($facilities_section['title_line_2'])): ?><br><?= e($facilities_section['title_line_2']) ?><?php endif; ?>
+          </h2>
+
+          <?php if (!empty($facilities_section['subtitle'])): ?>
+            <p class="section-sub mb-4" data-reveal><?= e($facilities_section['subtitle']) ?></p>
+          <?php endif; ?>
+
+          <?php if (!empty($facilities_items)): ?>
           <div class="row g-3" data-reveal>
-            <div class="col-12">
-              <div class="facility-item">
-                <div class="facility-icon"><i class="bi bi-lightning-charge"></i></div>
-                <div>
-                  <div class="facility-title">Premium Equipment</div>
-                  <div class="facility-desc">Rogue, Hammer Strength, and Eleiko platforms and free weights.</div>
+            <?php foreach ($facilities_items as $f): ?>
+              <div class="col-12">
+                <div class="facility-item">
+                  <?php if (!empty($f['icon'])): ?>
+                    <div class="facility-icon"><i class="<?= e($f['icon']) ?>"></i></div>
+                  <?php endif; ?>
+                  <div>
+                    <div class="facility-title"><?= e($f['title']) ?></div>
+                    <?php if (!empty($f['description'])): ?>
+                      <div class="facility-desc"><?= e($f['description']) ?></div>
+                    <?php endif; ?>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="col-12">
-              <div class="facility-item">
-                <div class="facility-icon"><i class="bi bi-droplet-half"></i></div>
-                <div>
-                  <div class="facility-title">Recovery Lounge</div>
-                  <div class="facility-desc">Cold plunge, sauna, compression therapy, and guided stretching.</div>
-                </div>
-              </div>
-            </div>
-            <div class="col-12">
-              <div class="facility-item">
-                <div class="facility-icon"><i class="bi bi-shield-check"></i></div>
-                <div>
-                  <div class="facility-title">Locker Rooms</div>
-                  <div class="facility-desc">Secure digital lockers, rain showers, and complimentary amenities.</div>
-                </div>
-              </div>
-            </div>
+            <?php endforeach; ?>
           </div>
+          <?php endif; ?>
         </div>
+
         <div class="col-lg-7">
           <div class="row g-3" data-reveal>
             <div class="col-7">
               <div style="border-radius: var(--radius); overflow: hidden; aspect-ratio: 3/4; box-shadow: var(--shadow-soft);">
-                <img src="https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=2070&auto=format&fit=crop" alt="Gym interior with premium equipment" style="width:100%;height:100%;object-fit:cover;" loading="lazy">
+                <?php if (!empty($facilities_section['image_main'])): ?>
+                  <img src="<?= e($facilities_section['image_main']) ?>"
+                       alt="Gym interior with premium equipment"
+                       style="width:100%;height:100%;object-fit:cover;" loading="lazy">
+                <?php endif; ?>
               </div>
             </div>
             <div class="col-5 d-flex flex-column gap-3">
               <div style="border-radius: var(--radius); overflow: hidden; aspect-ratio: 1; flex:1; box-shadow: var(--shadow-card);">
-                <img src="https://images.unsplash.com/photo-1558611848-73f7eb4001a1?q=80&w=2071&auto=format&fit=crop" alt="Dumbbell rack close-up" style="width:100%;height:100%;object-fit:cover;" loading="lazy">
+                <?php if (!empty($facilities_section['image_small_1'])): ?>
+                  <img src="<?= e($facilities_section['image_small_1']) ?>"
+                       alt="Gym equipment detail"
+                       style="width:100%;height:100%;object-fit:cover;" loading="lazy">
+                <?php endif; ?>
               </div>
               <div style="border-radius: var(--radius); overflow: hidden; aspect-ratio: 1; flex:1; box-shadow: var(--shadow-card);">
-                <img src="https://images.unsplash.com/photo-1574680096145-d05b474e2155?q=80&w=2069&auto=format&fit=crop" alt="Recovery lounge with sauna" style="width:100%;height:100%;object-fit:cover;" loading="lazy">
+                <?php if (!empty($facilities_section['image_small_2'])): ?>
+                  <img src="<?= e($facilities_section['image_small_2']) ?>"
+                       alt="Recovery lounge"
+                       style="width:100%;height:100%;object-fit:cover;" loading="lazy">
+                <?php endif; ?>
               </div>
             </div>
           </div>
@@ -1575,125 +1938,79 @@
       </div>
     </div>
   </section>
+  <?php endif; ?>
 
-  <!-- ============================================================
-       TRANSFORMATIONS
+    <!-- ============================================================
+       TESTIMONIALS — powered by testimonials_section, testimonials_items
        ============================================================ -->
-  <section class="section-pad" id="transformations">
-    <div class="container">
-      <div class="text-center mb-5">
-        <div class="section-label justify-content-center" data-reveal>Results</div>
-        <h2 class="section-title" data-reveal>Real People. Real Change.</h2>
-        <p class="section-sub mx-auto" data-reveal>Every transformation starts with a decision. These are just a few of thousands.</p>
-      </div>
-
-      <div class="row g-4">
-        <div class="col-lg-4 col-md-6" data-reveal>
-          <div class="transformation-card">
-            <div class="transformation-img-wrap">
-              <img src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=2070&auto=format&fit=crop" alt="Sarah's fitness transformation" loading="lazy">
-              <div class="transformation-label">12 Weeks</div>
-            </div>
-            <div class="transformation-info">
-              <div class="transformation-name">Sarah K.</div>
-              <div class="transformation-result">Lost 18 kg · Gained confidence</div>
-              <div class="transformation-stat">“The coaches didn't just train my body. They rewired my mindset.”</div>
-            </div>
-          </div>
-        </div>
-        <div class="col-lg-4 col-md-6" data-reveal>
-          <div class="transformation-card">
-            <div class="transformation-img-wrap">
-              <img src="https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?q=80&w=2070&auto=format&fit=crop" alt="David's muscle building transformation" loading="lazy">
-              <div class="transformation-label">6 Months</div>
-            </div>
-            <div class="transformation-info">
-              <div class="transformation-name">David M.</div>
-              <div class="transformation-result">Gained 7 kg lean muscle</div>
-              <div class="transformation-stat">“I've been in gyms for 10 years. This is the first place that actually felt different.”</div>
-            </div>
-          </div>
-        </div>
-        <div class="col-lg-4 col-md-6 mx-md-auto" data-reveal>
-          <div class="transformation-card">
-            <div class="transformation-img-wrap">
-              <img src="https://images.unsplash.com/photo-1594381898411-846e7d193883?q=80&w=1974&auto=format&fit=crop" alt="Priya's fitness journey" loading="lazy">
-              <div class="transformation-label">9 Months</div>
-            </div>
-            <div class="transformation-info">
-              <div class="transformation-name">Priya R.</div>
-              <div class="transformation-result">Postnatal strength · -12% body fat</div>
-              <div class="transformation-stat">“They met me where I was and built me back stronger. No judgment. Just work.”</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============================================================
-       TESTIMONIALS
-       ============================================================ -->
+  <?php if (!empty($testimonials_section) && !empty($testimonials_items)): ?>
   <section class="section-pad" id="testimonials" style="background: var(--charcoal-2);">
     <div class="container">
       <div class="text-center mb-5">
-        <div class="section-label justify-content-center" data-reveal>Community</div>
-        <h2 class="section-title" data-reveal>What Members Say</h2>
+        <?php if (!empty($testimonials_section['label'])): ?>
+          <div class="section-label justify-content-center" data-reveal><?= e($testimonials_section['label']) ?></div>
+        <?php endif; ?>
+        <?php if (!empty($testimonials_section['title'])): ?>
+          <h2 class="section-title" data-reveal><?= e($testimonials_section['title']) ?></h2>
+        <?php endif; ?>
+        <?php if (!empty($testimonials_section['subtitle'])): ?>
+          <p class="section-sub mx-auto" data-reveal><?= e($testimonials_section['subtitle']) ?></p>
+        <?php endif; ?>
       </div>
 
       <div class="row g-4">
-        <div class="col-lg-4 col-md-6" data-reveal>
-          <div class="testimonial-card">
-            <div class="testimonial-stars">★★★★★</div>
-            <p class="testimonial-text">“I've trained at gyms on three continents. Nothing comes close to the energy and precision at IRON ELITE. The programming is world-class.”</p>
-            <div class="testimonial-author">
-              <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=100&auto=format&fit=crop&crop=face" alt="James T." class="testimonial-avatar" loading="lazy">
-              <div>
-                <div class="testimonial-name">James Thornton</div>
-                <div class="testimonial-role">Member since 2021</div>
+        <?php
+          $tCount = count($testimonials_items);
+          foreach ($testimonials_items as $i => $t):
+            // Center the last single card on md+ if it's the trailing odd one
+            $isLastOdd = ($i === $tCount - 1) && ($tCount % 3 === 1);
+            $colClass  = $isLastOdd ? 'mx-md-auto' : '';
+            $stars     = max(0, min(5, (int)($t['stars'] ?? 5)));
+        ?>
+          <div class="col-lg-4 col-md-6 <?= $colClass ?>" data-reveal>
+            <div class="testimonial-card">
+              <div class="testimonial-stars"><?= str_repeat('★', $stars) ?></div>
+              <?php if (!empty($t['quote'])): ?>
+                <p class="testimonial-text">“<?= e($t['quote']) ?>”</p>
+              <?php endif; ?>
+              <div class="testimonial-author">
+                <?php if (!empty($t['avatar'])): ?>
+                  <img src="<?= e($t['avatar']) ?>"
+                       alt="<?= e($t['name']) ?>"
+                       class="testimonial-avatar" loading="lazy">
+                <?php endif; ?>
+                <div>
+                  <div class="testimonial-name"><?= e($t['name']) ?></div>
+                  <?php if (!empty($t['role'])): ?>
+                    <div class="testimonial-role"><?= e($t['role']) ?></div>
+                  <?php endif; ?>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-        <div class="col-lg-4 col-md-6" data-reveal>
-          <div class="testimonial-card">
-            <div class="testimonial-stars">★★★★★</div>
-            <p class="testimonial-text">“The personal training here is on another level. My coach adjusted everything to my schedule and my body. Down 15kg and stronger than ever.”</p>
-            <div class="testimonial-author">
-              <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=100&auto=format&fit=crop&crop=face" alt="Nina L." class="testimonial-avatar" loading="lazy">
-              <div>
-                <div class="testimonial-name">Nina Laurent</div>
-                <div class="testimonial-role">Member since 2022</div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-lg-4 col-md-6 mx-md-auto" data-reveal>
-          <div class="testimonial-card">
-            <div class="testimonial-stars">★★★★★</div>
-            <p class="testimonial-text">“The recovery lounge alone is worth the membership. Cold plunge, sauna, and actual coaching on mobility. My body feels 10 years younger.”</p>
-            <div class="testimonial-author">
-              <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=100&auto=format&fit=crop&crop=face" alt="Omar B." class="testimonial-avatar" loading="lazy">
-              <div>
-                <div class="testimonial-name">Omar Bakri</div>
-                <div class="testimonial-role">Member since 2020</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <?php endforeach; ?>
       </div>
     </div>
   </section>
+  <?php endif; ?>
 
-  <!-- ============================================================
-       SCHEDULE
+  
+    <!-- ============================================================
+       SCHEDULE — powered by schedule_section, schedule_times, schedule_cells
        ============================================================ -->
+  <?php if (!empty($schedule_section) && !empty($schedule_times)): ?>
   <section class="section-pad" id="schedule">
     <div class="container">
       <div class="mb-5">
-        <div class="section-label" data-reveal>Timetable</div>
-        <h2 class="section-title" data-reveal>Weekly Schedule</h2>
-        <p class="section-sub" data-reveal>Classes run seven days a week. Book via the member portal or at reception.</p>
+        <?php if (!empty($schedule_section['label'])): ?>
+          <div class="section-label" data-reveal><?= e($schedule_section['label']) ?></div>
+        <?php endif; ?>
+        <?php if (!empty($schedule_section['title'])): ?>
+          <h2 class="section-title" data-reveal><?= e($schedule_section['title']) ?></h2>
+        <?php endif; ?>
+        <?php if (!empty($schedule_section['subtitle'])): ?>
+          <p class="section-sub" data-reveal><?= e($schedule_section['subtitle']) ?></p>
+        <?php endif; ?>
       </div>
 
       <div class="schedule-table-wrap" data-reveal>
@@ -1711,184 +2028,125 @@
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td><span class="schedule-time">06:00</span></td>
-                <td><span class="schedule-class">Strength</span></td>
-                <td><span class="schedule-class">HIIT</span></td>
-                <td><span class="schedule-class">Strength</span></td>
-                <td><span class="schedule-class">CrossFit</span></td>
-                <td><span class="schedule-class">Strength</span></td>
-                <td><span class="schedule-class">Yoga</span></td>
-              </tr>
-              <tr>
-                <td><span class="schedule-time">08:00</span></td>
-                <td><span class="schedule-class">Cardio</span></td>
-                <td><span class="schedule-class">Yoga</span></td>
-                <td><span class="schedule-class">Cardio</span></td>
-                <td><span class="schedule-class">Yoga</span></td>
-                <td><span class="schedule-class">HIIT</span></td>
-                <td><span class="schedule-class">CrossFit</span></td>
-              </tr>
-              <tr>
-                <td><span class="schedule-time">12:00</span></td>
-                <td><span class="schedule-class">CrossFit</span></td>
-                <td><span class="schedule-class">Strength</span></td>
-                <td><span class="schedule-class">HIIT</span></td>
-                <td><span class="schedule-class">Cardio</span></td>
-                <td><span class="schedule-class">CrossFit</span></td>
-                <td><span class="schedule-class">Open Gym</span></td>
-              </tr>
-              <tr>
-                <td><span class="schedule-time">17:00</span></td>
-                <td><span class="schedule-class">HIIT</span></td>
-                <td><span class="schedule-class">CrossFit</span></td>
-                <td><span class="schedule-class">Strength</span></td>
-                <td><span class="schedule-class">HIIT</span></td>
-                <td><span class="schedule-class">Yoga</span></td>
-                <td><span class="schedule-class">—</span></td>
-              </tr>
-              <tr>
-                <td><span class="schedule-time">19:00</span></td>
-                <td><span class="schedule-class">Yoga</span></td>
-                <td><span class="schedule-class">Cardio</span></td>
-                <td><span class="schedule-class">CrossFit</span></td>
-                <td><span class="schedule-class">Strength</span></td>
-                <td><span class="schedule-class">Open Gym</span></td>
-                <td><span class="schedule-class">—</span></td>
-              </tr>
+              <?php foreach ($schedule_times as $row): ?>
+                <tr>
+                  <td><span class="schedule-time"><?= e($row['time_label']) ?></span></td>
+                  <?php for ($d = 1; $d <= 6; $d++): ?>
+                    <?php
+                      $className = $schedule_grid[$row['id']][$d] ?? '';
+                      $label     = ($className !== '' && $className !== null) ? $className : '—';
+                    ?>
+                    <td><span class="schedule-class"><?= e($label) ?></span></td>
+                  <?php endfor; ?>
+                </tr>
+              <?php endforeach; ?>
             </tbody>
           </table>
         </div>
       </div>
     </div>
   </section>
+  <?php endif; ?>
 
-  <!-- ============================================================
-       JOURNEY / HOW TO JOIN
+    <!-- ============================================================
+       JOURNEY — powered by journey_section, journey_steps
        ============================================================ -->
+  <?php if (!empty($journey_section) && !empty($journey_steps)): ?>
   <section class="section-pad" id="journey" style="background: var(--charcoal-2);">
     <div class="container">
       <div class="text-center mb-5">
-        <div class="section-label justify-content-center" data-reveal>Get Started</div>
-        <h2 class="section-title" data-reveal>Your Journey Starts Here</h2>
-        <p class="section-sub mx-auto" data-reveal>Four steps from where you are to where you want to be.</p>
+        <?php if (!empty($journey_section['label'])): ?>
+          <div class="section-label justify-content-center" data-reveal><?= e($journey_section['label']) ?></div>
+        <?php endif; ?>
+        <?php if (!empty($journey_section['title'])): ?>
+          <h2 class="section-title" data-reveal><?= e($journey_section['title']) ?></h2>
+        <?php endif; ?>
+        <?php if (!empty($journey_section['subtitle'])): ?>
+          <p class="section-sub mx-auto" data-reveal><?= e($journey_section['subtitle']) ?></p>
+        <?php endif; ?>
       </div>
 
       <div class="row g-4">
-        <div class="col-lg-3 col-md-6" data-reveal>
-          <div class="journey-step">
-            <div class="journey-number">01</div>
-            <div class="journey-title">Choose Your Plan</div>
-            <div class="journey-desc">Select the membership tier that fits your goals and schedule.</div>
+        <?php foreach ($journey_steps as $step): ?>
+          <div class="col-lg-3 col-md-6" data-reveal>
+            <div class="journey-step">
+              <?php if (!empty($step['number'])): ?>
+                <div class="journey-number"><?= e($step['number']) ?></div>
+              <?php endif; ?>
+              <div class="journey-title"><?= e($step['title']) ?></div>
+              <?php if (!empty($step['description'])): ?>
+                <div class="journey-desc"><?= e($step['description']) ?></div>
+              <?php endif; ?>
+            </div>
           </div>
-        </div>
-        <div class="col-lg-3 col-md-6" data-reveal>
-          <div class="journey-step">
-            <div class="journey-number">02</div>
-            <div class="journey-title">Free Consultation</div>
-            <div class="journey-desc">Meet with a coach to assess your baseline and set targets.</div>
-          </div>
-        </div>
-        <div class="col-lg-3 col-md-6" data-reveal>
-          <div class="journey-step">
-            <div class="journey-number">03</div>
-            <div class="journey-title">Get Your Program</div>
-            <div class="journey-desc">Receive a personalized training and nutrition roadmap.</div>
-          </div>
-        </div>
-        <div class="col-lg-3 col-md-6" data-reveal>
-          <div class="journey-step">
-            <div class="journey-number">04</div>
-            <div class="journey-title">Start Training</div>
-            <div class="journey-desc">Show up. Do the work. Watch everything change.</div>
-          </div>
-        </div>
+        <?php endforeach; ?>
       </div>
 
-      <div class="text-center mt-5" data-reveal>
-        <a href="#pricing" class="btn-accent magnetic" data-cursor="cta">Begin Your Transformation <i class="bi bi-arrow-right"></i></a>
-      </div>
+      <?php if (!empty($journey_section['cta_text']) && !empty($journey_section['cta_link'])): ?>
+        <div class="text-center mt-5" data-reveal>
+          <a href="<?= e($journey_section['cta_link']) ?>" class="btn-accent magnetic" data-cursor="cta">
+            <?= e($journey_section['cta_text']) ?>
+            <?php if (!empty($journey_section['cta_icon'])): ?>
+              <i class="<?= e($journey_section['cta_icon']) ?>"></i>
+            <?php endif; ?>
+          </a>
+        </div>
+      <?php endif; ?>
     </div>
   </section>
+  <?php endif; ?>
 
-  <!-- ============================================================
-       FAQ
+    <!-- ============================================================
+       FAQ — powered by faq_section, faq_items
        ============================================================ -->
+  <?php if (!empty($faq_section) && !empty($faq_items)): ?>
   <section class="section-pad" id="faq">
     <div class="container">
       <div class="row g-5">
         <div class="col-lg-4">
-          <div class="section-label" data-reveal>Questions</div>
-          <h2 class="section-title" data-reveal>Everything<br>You Need to Know</h2>
-          <p class="section-sub" data-reveal>Still curious? Reach out via the contact form below.</p>
+          <?php if (!empty($faq_section['label'])): ?>
+            <div class="section-label" data-reveal><?= e($faq_section['label']) ?></div>
+          <?php endif; ?>
+          <?php if (!empty($faq_section['title'])): ?>
+            <h2 class="section-title" data-reveal><?= faq_title_html($faq_section['title']) ?></h2>
+          <?php endif; ?>
+          <?php if (!empty($faq_section['subtitle'])): ?>
+            <p class="section-sub" data-reveal><?= e($faq_section['subtitle']) ?></p>
+          <?php endif; ?>
         </div>
+
         <div class="col-lg-8">
           <div class="accordion accordion-elite" id="faqAccordion" data-reveal>
-            <div class="accordion-item">
-              <h3 class="accordion-header">
-                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faq1" aria-expanded="true">
-                  Do I need experience to join?
-                </button>
-              </h3>
-              <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
-                <div class="accordion-body">
-                  Absolutely not. Our programs are designed for every level, from complete beginners to advanced athletes. Every new member receives a free orientation and movement assessment with one of our coaches.
+            <?php foreach ($faq_items as $i => $item): ?>
+              <?php
+                $idx      = $i + 1;
+                $target   = 'faq' . $idx;
+                $isOpen   = ($i === 0); // first one open by default
+                $btnClass = 'accordion-button' . ($isOpen ? '' : ' collapsed');
+                $colClass = 'accordion-collapse collapse' . ($isOpen ? ' show' : '');
+              ?>
+              <div class="accordion-item">
+                <h3 class="accordion-header">
+                  <button class="<?= $btnClass ?>" type="button"
+                          data-bs-toggle="collapse"
+                          data-bs-target="#<?= $target ?>"
+                          aria-expanded="<?= $isOpen ? 'true' : 'false' ?>">
+                    <?= e($item['question']) ?>
+                  </button>
+                </h3>
+                <div id="<?= $target ?>" class="<?= $colClass ?>" data-bs-parent="#faqAccordion">
+                  <div class="accordion-body">
+                    <?= e($item['answer'] ?? '') ?>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="accordion-item">
-              <h3 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
-                  Can I freeze or cancel my membership?
-                </button>
-              </h3>
-              <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                <div class="accordion-body">
-                  Yes. Memberships can be frozen for up to 3 months per year at no cost. Cancellation requires 30 days written notice. No lock-in contracts — we earn your loyalty every month.
-                </div>
-              </div>
-            </div>
-            <div class="accordion-item">
-              <h3 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
-                  What are the opening hours?
-                </button>
-              </h3>
-              <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                <div class="accordion-body">
-                  Monday to Friday: 5:00 AM – 11:00 PM. Saturday: 6:00 AM – 9:00 PM. Sunday: 7:00 AM – 8:00 PM. Elite members receive 24/7 access via secure key fob.
-                </div>
-              </div>
-            </div>
-            <div class="accordion-item">
-              <h3 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
-                  Is parking available?
-                </button>
-              </h3>
-              <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                <div class="accordion-body">
-                  Yes, complimentary secure parking is available for all members in the underground facility adjacent to the gym. Bike storage is also available.
-                </div>
-              </div>
-            </div>
-            <div class="accordion-item">
-              <h3 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq5">
-                  Do you offer nutrition coaching?
-                </button>
-              </h3>
-              <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                <div class="accordion-body">
-                  Yes. Nutrition coaching is included in the Elite plan and available as an add-on for Basic and Pro members. Our registered dietitians build sustainable plans — no crash diets.
-                </div>
-              </div>
-            </div>
+            <?php endforeach; ?>
           </div>
         </div>
       </div>
     </div>
   </section>
+  <?php endif; ?>
 
   <!-- ============================================================
        CONTACT

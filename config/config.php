@@ -2,7 +2,7 @@
 
 // Database configuration
 $host = 'localhost:3307';
-$dbname = 'iron_elite_fitness';
+$dbname = 'ironelite';
 $user = 'root';
 $pass = '';
 
